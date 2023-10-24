@@ -1,0 +1,106 @@
+---
+- name: Config App Server Java Application
+  hosts: app01
+
+  user: vagrant
+  become_user: app
+  vars:
+      dbhost: "db01"
+      dbnome: "notes"
+      dbusername: "notesapp"
+      dbpassword: "devops"
+  tasks:
+    
+    - name: Adding user's app 
+      user: 
+        name: app
+        comment: application user 
+        uid: 500
+
+    - name: download maven
+      get_url:
+        url: https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.1.0/apache-maven-3.1.0-bin.tar.gz
+        dest: /opt/apache-maven-3.1.0-bin.tar.gz
+        mode: "0777"
+
+    
+    - name: Unzip maven package 
+      ansible.builtin.unarchive:
+        src: /opt/apache-maven-3.1.0-bin.tar.gz 
+        dest: /opt/
+        remote_src: yes
+
+
+    - name: Java Install Application 
+      yum:
+        name: java-1.8.0-openjdk
+        state: present
+
+    - name: Making app folder 
+      file: 
+        path: /opt/notes
+        state: directory 
+        owner: app 
+        group: app 
+
+    - name: Install Git Client
+      yum:
+        name: git
+        state: latest 
+
+    - name: Cloning repo notes - app
+      git:
+        repo: 'https://github.com/callicoder/spring-boot-mysql-rest-api-tutorial.git'
+        dest: /opt/notes
+        clone: yes
+        force: yes 
+
+    - name:  configurar arquivo pom.xml com repos maven central
+      template:
+        src: pom.xml 
+        dest: /opt/notes/pom.xml
+
+    #Trabalhando com template no Ansible
+    - name: Configurar arquivo de propriedades para banco de dados
+      template: 
+        src: application.properties #default diretorio templates
+        dest: /opt/notes/src/main/resources/application.properties
+
+    - name: Gerar pacote da aplicação
+      command: /opt/apache-maven-3.1.0/bin/mvn -f /opt/notes/pom.xml package
+      become_user: app
+
+    - name: Register app version - versao atual do pacote
+      shell:
+        cmd: /opt/apache-maven-3.1.0/bin/mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version | grep -v '\['
+        chdir: /opt/notes
+      register: app_version
+
+    - name: Config systemd service 
+      template:
+        src: etc/systemd/system/notes.service 
+        dest: /et/systemd/system/notes.service
+        owner: root
+        group: root
+      notify: reload daemon 
+
+    - name: Start Note Service 
+      service:
+        name: notes
+        state: restarted
+
+  roles: 
+      - configuracao-default-so
+  handlers:
+    - name: reload app 
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: 'notes' 
+    - name: reload daemon 
+      systemd: 
+        daemon_reexec: yes
+
+
+
+...

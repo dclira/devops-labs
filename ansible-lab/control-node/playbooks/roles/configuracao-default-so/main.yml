@@ -1,0 +1,19 @@
+- name: Upgrade all packages OS Centos 
+  yum:
+    name: "*"
+    state: latest
+
+- name: Install git client
+  yum:
+    name: git 
+    state: present
+
+- name: Config lab hosts ansible 
+  lineinfile: 
+    dest: /etc/hosts
+    state: present
+    line: "{{item}}"
+  with_items:
+    - 192.168.56.2 control-node
+    - 192.168.56.3 app01
+    - 192.168.56.4 db01

@@ -1,0 +1,109 @@
+---
+- hosts: webservers
+  become: yes
+  tasks:
+
+    - name: install apache web server
+      yum: 
+        name: httpd
+        state: latest
+
+    - name: enable and start Apache server
+      service:
+        name: http
+        enabled: yes
+        state: started
+    - name: open firewall port
+      firewalld:
+        service: httpd
+        immediate: true
+        permanent: true
+        state: enabled
+
+    - name: create web admin group
+      group:
+        name: web
+        state: present
+    - name: Create a web admin user
+      user:
+        name: webadm
+        comment: "Web admin"
+        passworkd: "admin"
+        groups: web
+        append: yes
+
+    - name: set content directory group/permissions
+      file:
+        path: /var/www/html
+        group: web
+        state: directory 
+        mode: u=rwx, g=rwx, o=rx, g+s s
+
+    - name: create default page content
+      copy:
+        content: "Welcome to {{ansible_fqdn}} on {{ansible_default_ip_address}}"
+        dest: /var/www/html/index.html
+        owner: webadm
+        group: web
+        mode: u=rw, g=rw,o=r
+
+- hosts: dbservers
+  become: true
+  tasks: 
+
+    - name: install maria db server 
+      yum: 
+        name: mariadb-server
+        state: latest
+    - name: enable and start mariadb server
+      service:
+        name: mariadb
+        enabled: yes
+        state: started
+- hosts: logservers
+  become: yes
+  tasks:
+
+    - name: configure rsyslog remove log reception over upd
+      lineinfile:
+        path: /etc/rsyslog.conf
+        line: "{{item}}"
+        state: present
+      with_items:
+        - '$ModLoad imudp'
+        - '$UDPServerRun 514'
+      notify: 
+        - restart rsyslogd 
+
+    - name: Open firewall port
+      firewalld: 
+        port: 514/udp
+        immediate: true
+        permanent: true
+        state: enabled 
+  handless:
+    - name: restart rsyslogd 
+      service: 
+        name: rsyslog
+        state: restarted 
+- hosts: lamp
+  become: yes
+  tasks:
+
+    - name: configure rsyslog
+      lineinfile:
+        path: /etc/rsyslog.conf
+        line: '*.* @192.168.102.215:514'
+        state: present
+      notify: 
+        - restarted rsyslogd
+  handlers:
+    - name: restart rsyslogd
+      service: 
+        name: rsyslog
+        state: restarted 
+
+      
+
+
+

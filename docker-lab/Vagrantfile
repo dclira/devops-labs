@@ -1,0 +1,17 @@
+Vagrant.configure("2") do |config|
+	config.vm.define "dockerctr" do |dockerctr|
+	dockerctr.vm.box = "centos/7"
+	dockerctr.vm.provider "virtualbox" do |vb|
+	dockerctr.vm.hostname = "dockerctr"
+	dockerctr.vm.network "private_network", ip: "192.168.33.60"  #auto_config: false
+        dockerctr.vm.network "forwarded_port", guest: 80, host: 8081, host_ip: "127.0.0.1"
+    	dockerctr.vm.synced_folder ".", "/vagrant_data", type: "rsync"
+      		vb.memory = "800"
+      		vb.cpus= "1"
+    		end
+	end
+	config.vm.provision "shell", path: "provision.sh"
+end
+
+
+
